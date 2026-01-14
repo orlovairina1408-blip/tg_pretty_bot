@@ -1,48 +1,66 @@
-# Для подключения библиотеки telebot нужно в google colab добавить: !pip install pyTelegramBotAPI
+# В Colab в отдельной ячейке: !pip install pyTelegramBotAPI
+
 from telebot import TeleBot, types
 import json
+import os
+import html
 
-bot = TeleBot(token='ВСТАВИТЬ_СВОЙ_ТОКЕН', parse_mode='html') # создание бота
+bot = TeleBot(token='Вставить_свой_токен', parse_mode='html')  # создание бота
 
-
-# обработчик команды '/start'
 @bot.message_handler(commands=['start'])
 def start_command_handler(message: types.Message):
-    # отправляем ответ на команду '/start'
     bot.send_message(
-        chat_id=message.chat.id, # id чата, в который необходимо направить сообщение
-        text='Привет! Я умею проверять JSON и форматировать его в красивый текст\nВведи JSON в виде строки:', # текст сообщения
+        chat_id=message.chat.id,
+        text='Привет! Я умею проверять JSON и форматировать его в красивый текст\nВведи JSON в виде строки:',
     )
 
-# обработчик всех остальных сообщений
+
 @bot.message_handler()
 def message_handler(message: types.Message):
     try:
-        # пытаемся распарсить JSON из текста сообщения
         payload = json.loads(message.text)
     except json.JSONDecodeError as ex:
-        # при ошибке взникнет исключение 'json.JSONDecodeError'
-        # преобразовываем исключение в строку и выводим пользователю
         bot.send_message(
             chat_id=message.chat.id,
-            text=f'При обработке произошла ошибка:\n<code>{str(ex)}</code>'
+            text=f'При обработке произошла ошибка:\n<code>{html.escape(str(ex))}</code>'
         )
-        # выходим из функции
         return
-    
-    # если исключения не возникло - значит был введен корректный JSON
-    # форматируем его в красивый текст :) (отступ 2 пробела на уровень, сортировать ключи по алфавиту)
-    text = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False)
-    # и выводим пользователю
+
+    pretty = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False)
+
+    # сохраняем JSON в файл
+    filename = 'pretty_json.json'
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(pretty)
+
+    # создаем кнопку "Преобразовать в файл"
+    markup = types.InlineKeyboardMarkup()
+    button = types.InlineKeyboardButton("Преобразовать в файл", callback_data='send_file')
+    markup.add(button)
+
+    # ОДИН вызов — отправляем отформатированный JSON и добавляем кнопку
     bot.send_message(
         chat_id=message.chat.id,
-        text=f'JSON:\n<code>{text}</code>'
+        text=f'JSON:\n<pre>{html.escape(pretty)}</pre>',
+        reply_markup=markup
     )
 
 
-# главная функция программы
+@bot.callback_query_handler(func=lambda call: call.data == 'send_file')
+def callback_send_file(call: types.CallbackQuery):
+    filename = 'formatted_json.json'
+    if os.path.exists(filename):
+        with open(filename, 'rb') as f:
+            bot.send_document(chat_id=call.message.chat.id, document=f)
+        try:
+            os.remove(filename)
+        except OSError:
+            pass
+    else:
+        bot.answer_callback_query(call.id, "Файл не найден")
+
+
 def main():
-    # запускаем нашего бота
     bot.infinity_polling()
 
 
