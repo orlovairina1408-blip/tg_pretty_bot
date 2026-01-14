@@ -1,4 +1,4 @@
-# Для подключение библиотеки telebot нужно в google colab добавить: !pip install pyTelegramBotAPI
+# Для подключения библиотеки telebot нужно в google colab добавить: !pip install pyTelegramBotAPI
 from telebot import TeleBot, types
 import json
 
